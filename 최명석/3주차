@@ -1,0 +1,96 @@
+import torch
+import torch.nn as nn
+import numpy
+import torchvision.datasets as dsets
+import torchvision.transforms as transforms
+import torch.nn.init
+rate=0.005
+epoch=20
+batch_size = 64
+device = 'cuda' if torch.cuda.is_available() else 'cpu' # gpu 있으면 gpu 사용
+mnist_train = dsets.FashionMNIST( root = 'MNIST_data/',
+                          train= True,
+                          transform = transforms.ToTensor(),
+                          download=True)
+
+mnist_test = dsets.FashionMNIST( root = 'MNIST_data/',
+                          train= False,
+                          transform = transforms.ToTensor(),
+                          download=True)
+data = torch.utils.data.DataLoader(mnist_train, batch_size, shuffle=True)
+test_loader  = torch.utils.data.DataLoader(mnist_test,  batch_size=batch_size, shuffle=False)
+class CNN(nn.Module):
+    def __init__(self):
+        super(CNN, self).__init__()
+        self.layer1 = nn.Sequential(
+            nn.Conv2d(1,32, kernel_size = 3 , stride = 1, padding = 1),
+            nn.ReLU(),
+            nn.MaxPool2d(2) # B, 32, 14, 14
+
+        )
+        self.layer2 = nn.Sequential(
+            nn.Conv2d(32,64, kernel_size = 3 , stride = 1, padding = 1),
+            nn.ReLU(),
+            nn.MaxPool2d(2)  # B, 64, 7, 7
+        )
+        self.layer3 = nn.Sequential(
+            nn.Conv2d(64,128, kernel_size = 3 , stride = 1, padding = 1),
+            nn.ReLU(),
+            nn.MaxPool2d(2)  # B, 128, 3, 3
+        )
+        self.fc=nn.Linear(3*3*128,10, bias=True) # flatten -> 클래스 갯수, 미사용
+        self.fc1 = nn.Linear(3*3*128,256) # flatten -> 256 뉴런
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(256,10,bias=True) # 히든 -> 클래스 갯수
+        torch.nn.init.xavier_uniform_(self.fc.weight) #가중치 초기화, 미사용
+
+    def forward(self, x):
+        out = self.layer1(x)
+        out = self.layer2(out)
+        out = self.layer3(out)
+        out = out.view(out.size(0),-1) # flatten
+        out = self.relu(self.fc1(out))
+        out = self.fc2(out)
+        return out
+model = CNN().to(device)
+cr = nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam(model.parameters(), lr = rate)
+total_batch = len(data)
+
+for e in range(epoch):
+    avg_cost = 0
+    acc = 0
+    tot = 0
+    for x,y in data:
+
+        x=x.to(device)
+        y=y.to(device)
+
+        hy=model(x) # 훈련
+        cost = cr(hy, y) # 손실값
+
+        optimizer.zero_grad() # 가중치 초기화
+        cost.backward() # 역전파
+        optimizer.step() # 가중치 업데이트
+        avg_cost +=cost / total_batch  # 평균 손실값
+
+        prediction = torch.argmax(hy, dim=1).float()
+        acc += (prediction == y).sum().item()
+        tot += y.size(0)
+    accuracy = 100 * acc / tot # 훈련 정확도 추가
+
+    if e%5==0:
+        print('[Epoch: {}] cost = {} acc = {}'.format(e, avg_cost, accuracy))
+
+
+print("학습 완료")
+with torch.no_grad(): # 가중치 X
+  for x_test, y_test in test_loader:
+    x_test = x_test.to(device)
+    y_test = y_test.to(device)
+    pr = model(x_test)
+    co_pr = torch.argmax(pr, 1) == y_test
+    accuracy = co_pr.float().mean()
+  print("Accuracy:",accuracy.item()*100)
+
+print("테스트 완료")
