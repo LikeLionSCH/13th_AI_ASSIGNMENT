@@ -1,0 +1,132 @@
+import torch
+import torch.nn as nn
+import numpy
+import torchvision.datasets as datasets
+import torchvision.transforms as transforms
+from torch.utils.data import DataLoader
+import torch.nn.init
+import matplotlib.pyplot as plt
+
+rate=0.001
+epoch=20
+batch_size = 64
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(device
+cuda
+
+Fashionmnist_train = datasets.FashionMNIST(
+    root='FashionMNIST/',
+    train=True,
+    transform=transforms.ToTensor(),
+    download=True
+)
+
+Fashionmnist_test = datasets.FashionMNIST(
+    root='FashionMNIST/',
+    train=False,
+    transform=transforms.ToTensor(),
+    download=True
+)
+
+data = DataLoader(Fashionmnist_train, batch_size=batch_size, shuffle=True)
+test_data = DataLoader(Fashionmnist_test, batch_size=batch_size)
+
+
+class CNN(nn.Module):
+    def __init__(self):
+        super(CNN, self).__init__()
+        self.model = nn.Sequential(
+            nn.Conv2d(1, 32, kernel_size=3, stride=1, padding=1),
+            nn.Dropout(0.3),
+            nn.ReLU(),
+            nn.MaxPool2d(2), # B,32,14,14
+
+            nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2), # B,64,7,7
+
+            nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),
+            nn.Dropout(0.3),
+            nn.ReLU(),
+            nn.MaxPool2d(2), # B,128,3,3
+
+            nn.Flatten(),
+
+            nn.Linear(128 * 3* 3, 256, bias=True),
+            nn.Dropout(0.3),
+            nn.Linear(256, 10)
+        )
+
+    def forward(self, x):
+      return self.model(x)
+
+
+model = CNN().to(device)
+cr = nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam(model.parameters(), lr=rate)
+
+for epoch in range(epoch):
+  model.train()
+  cor = 0
+  tot = 0
+  cost = 0
+  for image, label in data:
+    image= image.to(device)
+    label= label.to(device)
+
+    optimizer.zero_grad()
+
+    pred = model(image)
+    loss = cr(pred, label)
+    loss.backward()
+    optimizer.step()
+    cost += loss / len(data)
+
+    cor += (torch.argmax(pred, dim=1)==label).float().sum()
+    tot += label.size(0)
+    acc = 100 * cor / tot
+  print(f"[Epoch {epoch+1}] Cost: {cost:.2f}, train_acc: {acc:.2f}")
+
+[Epoch 1] Cost: 0.51, train_acc: 81.07
+[Epoch 2] Cost: 0.33, train_acc: 87.93
+[Epoch 3] Cost: 0.29, train_acc: 89.38
+[Epoch 4] Cost: 0.26, train_acc: 90.57
+[Epoch 5] Cost: 0.24, train_acc: 91.05
+[Epoch 6] Cost: 0.23, train_acc: 91.52
+[Epoch 7] Cost: 0.22, train_acc: 92.10
+[Epoch 8] Cost: 0.21, train_acc: 92.35
+[Epoch 9] Cost: 0.20, train_acc: 92.64
+[Epoch 10] Cost: 0.19, train_acc: 92.92
+[Epoch 11] Cost: 0.18, train_acc: 93.24
+[Epoch 12] Cost: 0.18, train_acc: 93.25
+[Epoch 13] Cost: 0.17, train_acc: 93.56
+[Epoch 14] Cost: 0.17, train_acc: 93.77
+[Epoch 15] Cost: 0.16, train_acc: 94.08
+[Epoch 16] Cost: 0.16, train_acc: 94.06
+[Epoch 17] Cost: 0.15, train_acc: 94.28
+[Epoch 18] Cost: 0.15, train_acc: 94.34
+[Epoch 19] Cost: 0.15, train_acc: 94.39
+[Epoch 20] Cost: 0.15, train_acc: 94.51
+
+
+model.eval()
+
+with torch.no_grad():
+  cor = 0
+  tot = 0
+  for image, label in test_data:
+    image = image.to(device)
+    label = label.to(device)
+
+    pred = model(image)
+    loss = cr(pred, label)
+
+    cor += (torch.argmax(pred, dim=1)==label).float().sum()
+    tot += label.size(0)
+    acc = 100 * cor / tot
+  print(f"Accuracy: {acc:.2f}%")
+
+Accuracy: 91.89%
+
+
